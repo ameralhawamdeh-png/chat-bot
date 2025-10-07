@@ -51,9 +51,3 @@ def decode_jwt_token(token: str) -> dict:
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
     
-# email = 'prottoitruyessa-2789@yopmail.com'
-# password = 'Demo@2022'
-
-# if __name__ == "__main__":
-#     token = asyncio.run(login_user(email, password))
-#     print(decode_jwt_token(token=token))
