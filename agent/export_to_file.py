@@ -37,10 +37,6 @@ def export_to_word(data, filename="report.docx"):
     doc.save(filename)
     return filename
 
-# def export_to_excel(data, filename="report.xlsx"):
-#     df = pd.DataFrame(data)
-#     df.to_excel(filename, index=False)
-#     return filename
 def export_to_excel(data, filename="report.xlsx"):
     df = pd.DataFrame(data)
 
@@ -50,4 +46,5 @@ def export_to_excel(data, filename="report.xlsx"):
             df[col] = df[col].dt.tz_localize(None)
 
     df.to_excel(filename, index=False)
+
     return filename
