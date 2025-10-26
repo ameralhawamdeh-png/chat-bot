@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Chat UI ----</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
-    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <style>
     
@@ -359,179 +359,240 @@
         </div>
     </div>
     </div>
-      <script>
-    const chatMessages = document.getElementById('chatMessages');
-        const messageInput = document.getElementById('messageInput');
-        const sendButton = document.getElementById('sendButton');
-        const typingIndicator = document.getElementById('typingIndicator');
+      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+      
+<script>
+  const chatMessages = document.getElementById('chatMessages');
+  const messageInput = document.getElementById('messageInput');
+  const sendButton = document.getElementById('sendButton');
+  const typingIndicator = document.getElementById('typingIndicator');
 
-        // Auto-resize textarea
-        messageInput.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 128) + 'px';
+  // Auto-resize textarea
+  messageInput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 128) + 'px';
+  });
+
+  // Function to send message to backend
+  async function sendToBackend(message) {
+    try {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        window.location.href = "login.html";
+      }
+      const response = await fetch('http://127.0.0.1:8000/ask', {
+        method: 'POST',
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ query: message })
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      const data = await response.json();
+      return data; 
+    } catch (error) {
+      console.error('Error:', error);
+      return { answer: 'Sorry, I\'m having trouble connecting to the server. Please try again later.' };
+    }
+  }
+
+  function displayBotMessage(response) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'flex items-start space-x-3 message-animation';
+
+    const botAvatar = `
+      <div class="w-8 h-8 bg-black rounded-full flex items-center justify-center flex-shrink-0">
+        <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"></path>
+        </svg>
+      </div>`;
+
+    let content = '';
+
+    if (response.answer && response.answer.type === 'chart') {
+      const chartData = response.answer;
+      const chartId = 'chart-' + Date.now();
+
+      content = `
+        <div class="message-bubble bot-message bg-gray-100 rounded-2xl rounded-tl-sm px-4 py-3 border border-gray-200">
+          <p class="text-sm font-medium text-gray-800 mb-3">${chartData.title || 'Chart'}</p>
+          <div class="w-full" style="max-width: 500px; margin: 0 auto;">
+            <canvas id="${chartId}"></canvas>
+          </div>
+          <span class="text-xs text-gray-500 mt-2 block">Just now</span>
+        </div>`;
+
+      messageDiv.innerHTML = botAvatar + content;
+      chatMessages.appendChild(messageDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      setTimeout(() => {
+        const ctx = document.getElementById(chartId).getContext('2d');
+        new Chart(ctx, {
+          type: chartData.chart_type || 'bar',
+          data: {
+            labels: chartData.x,
+            datasets: [{
+              label: chartData.title || 'Data',
+              data: chartData.y,
+              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              borderColor: 'rgb(0, 0, 0)',
+              borderWidth: 1,
+              borderRadius: 4,
+              borderSkipped: false,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { enabled: true }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                grid: { color: 'rgba(0,0,0,0.05)' },
+                ticks: { color: '#374151' }
+              },
+              x: {
+                grid: { display: false },
+                ticks: { color: '#374151' }
+              }
+            }
+          }
         });
+      }, 100);
 
-        // Function to send message to backend
-        async function sendToBackend(message) {
-            try {
-                const token = localStorage.getItem("access_token");
-                if (!token) {
-                  window.location.href = "login.html";
-                }
-                const response = await fetch('http://127.0.0.1:8000/ask', {
-                    method: 'POST',
-                    headers: {
-                      "Content-Type": "application/json",
-                      "Authorization": `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ query: message })
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                
-                const data = await response.json();
-                return data.answer || data.message || 'Sorry, I couldn\'t process that request.';
-            } catch (error) {
-                console.error('Error:', error);
-                return 'Sorry, I\'m having trouble connecting to the server. Please try again later.';
-            }
-        }
+   } else {
+      let text = 'No response';
 
-        function displayBotMessage(message) {
-            const el = document.createElement('div');
-            el.classList.add('flex', 'mb-4');
-            const renderedMessage = marked.parse(message);
-            el.innerHTML = `<div class="bg-gray-200 p-3 rounded-lg max-w-4xl"><div class="text-sm prose prose-sm max-w-none">${renderedMessage}</div></div>`;
-            chatMessages.appendChild(el);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
+      if (typeof response.answer === 'string') {
+        text = response.answer;
+      } else if (response.answer && typeof response.answer === 'object') {
+        text = response.answer.data || 'No response';
+      }
 
-        function addUserMessage(content) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'flex items-start space-x-3 message-animation flex-row-reverse space-x-reverse';
-            
-            const now = new Date();
-            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const rendered = marked.parse(text);
+      content = `
+        <div class="message-bubble bot-message bg-gray-100 rounded-2xl rounded-tl-sm px-4 py-3 border border-gray-200">
+          <div class="prose prose-sm max-w-none text-gray-800">${rendered}</div>
+          <span class="text-xs text-gray-500 mt-1 block">Just now</span>
+        </div>`;
 
-            messageDiv.innerHTML = `
-                <div class="w-8 h-8 bg-black rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
-                    </svg>
-                </div>
-                <div class="message-bubble user-message bg-black text-white rounded-2xl rounded-tr-sm px-4 py-3">
-                    <div class="text-white markdown-content prose prose-sm max-w-none">${marked.parse(content)}</div>
-                    <span class="text-xs text-white text-opacity-70 mt-1 block">${timeString}</span>
-                </div>
-            `;
+      messageDiv.innerHTML = botAvatar + content;
+      chatMessages.appendChild(messageDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+  }
 
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
+  function addUserMessage(content) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'flex items-start space-x-3 message-animation flex-row-reverse space-x-reverse';
+    const now = new Date();
+    const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        function showTypingIndicator() {
-            typingIndicator.classList.remove('hidden');
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
+    messageDiv.innerHTML = `
+      <div class="w-8 h-8 bg-black rounded-full flex items-center justify-center flex-shrink-0">
+        <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
+        </svg>
+      </div>
+      <div class="message-bubble user-message bg-black text-white rounded-2xl rounded-tr-sm px-4 py-3">
+        <div class="text-white markdown-content prose prose-sm max-w-none">${marked.parse(content)}</div>
+        <span class="text-xs text-white text-opacity-70 mt-1 block">${timeString}</span>
+      </div>`;
 
-        function hideTypingIndicator() {
-            typingIndicator.classList.add('hidden');
-        }
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
 
-        async function sendMessage() {
-            const message = messageInput.value.trim();
-            if (!message) return;
+  function showTypingIndicator() {
+    typingIndicator.classList.remove('hidden');
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
 
-            // Add user message
-            addUserMessage(message);
-            messageInput.value = '';
-            messageInput.style.height = 'auto';
+  function hideTypingIndicator() {
+    typingIndicator.classList.add('hidden');
+  }
 
-            // Hide suggested messages after first interaction
-            const suggestedMessages = document.getElementById('suggestedMessages');
-            if (suggestedMessages && !suggestedMessages.classList.contains('hidden')) {
-                suggestedMessages.classList.add('hidden');
-            }
+  async function sendMessage() {
+    const message = messageInput.value.trim();
+    if (!message) return;
 
-            // Show typing indicator
-            showTypingIndicator();
+    addUserMessage(message);
+    messageInput.value = '';
+    messageInput.style.height = 'auto';
 
-            // Send message to backend and get response
-            const botResponse = await sendToBackend(message);
-            
-            // Hide typing indicator and show response
-            hideTypingIndicator();
-            displayBotMessage(botResponse);
-        }
+    const suggestedMessages = document.getElementById('suggestedMessages');
+    if (suggestedMessages && !suggestedMessages.classList.contains('hidden')) {
+      suggestedMessages.classList.add('hidden');
+    }
 
-        function sendSuggestion(suggestionText) {
-            messageInput.value = suggestionText;
-            sendMessage();
-        }
+    showTypingIndicator();
+    const response = await sendToBackend(message);
+    hideTypingIndicator();
+    displayBotMessage(response);
+  }
 
-        // Event listeners
-        sendButton.addEventListener('click', sendMessage);
+  function sendSuggestion(suggestionText) {
+    messageInput.value = suggestionText;
+    sendMessage();
+  }
 
-        messageInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
+  // Event listeners
+  sendButton.addEventListener('click', sendMessage);
+  messageInput.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
 
-        // Chat interface controls
-        const chatButton = document.getElementById('chatButton');
-        const chatInterface = document.getElementById('chatInterface');
-        const closeChat = document.getElementById('closeChat');
+  // Chat interface controls
+  const chatButton = document.getElementById('chatButton');
+  const chatInterface = document.getElementById('chatInterface');
+  const closeChat = document.getElementById('closeChat');
 
-        function openChat() {
-            chatButton.style.transform = 'scale(0)';
-            chatButton.style.opacity = '0';
-            
-            setTimeout(() => {
-                chatButton.style.display = 'none';
-                chatInterface.style.display = 'block';
-                
-                requestAnimationFrame(() => {
-                    chatInterface.classList.remove('opacity-0', 'pointer-events-none', 'scale-95');
-                    chatInterface.classList.add('opacity-100', 'scale-100');
-                    
-                    setTimeout(() => {
-                        messageInput.focus();
-                    }, 300);
-                });
-            }, 200);
-        }
+  function openChat() {
+    chatButton.style.transform = 'scale(0)';
+    chatButton.style.opacity = '0';
+    setTimeout(() => {
+      chatButton.style.display = 'none';
+      chatInterface.style.display = 'block';
+      requestAnimationFrame(() => {
+        chatInterface.classList.remove('opacity-0', 'pointer-events-none', 'scale-95');
+        chatInterface.classList.add('opacity-100', 'scale-100');
+        setTimeout(() => { messageInput.focus(); }, 300);
+      });
+    }, 200);
+  }
 
-        function closeChatInterface() {
-            chatInterface.classList.remove('opacity-100', 'scale-100');
-            chatInterface.classList.add('opacity-0', 'scale-95');
-            
-            setTimeout(() => {
-                chatInterface.style.display = 'none';
-                chatInterface.classList.add('pointer-events-none');
-                
-                chatButton.style.display = 'block';
-                requestAnimationFrame(() => {
-                    chatButton.style.transform = 'scale(1)';
-                    chatButton.style.opacity = '1';
-                });
-            }, 500);
-        }
+  function closeChatInterface() {
+    chatInterface.classList.remove('opacity-100', 'scale-100');
+    chatInterface.classList. add('opacity-0', 'scale-95');
+    setTimeout(() => {
+      chatInterface.style.display = 'none';
+      chatInterface.classList.add('pointer-events-none');
+      chatButton.style.display = 'block';
+      requestAnimationFrame(() => {
+        chatButton.style.transform = 'scale(1)';
+        chatButton.style.opacity = '1';
+      });
+    }, 500);
+  }
 
-        // Event listeners for chat controls
-        chatButton.addEventListener('click', openChat);
-        closeChat.addEventListener('click', closeChatInterface);
+  chatButton.addEventListener('click', openChat);
+  closeChat.addEventListener('click', closeChatInterface);
 
-        // Close chat with Escape key
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && !chatInterface.classList.contains('opacity-0')) {
-                closeChatInterface();
-            }
-        });
-
-  </script>
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && !chatInterface.classList.contains('opacity-0')) {
+      closeChatInterface();
+    }
+  });
+</script>
 </body>
 </html>
